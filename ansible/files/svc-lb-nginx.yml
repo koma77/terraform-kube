@@ -4,10 +4,13 @@ metadata:
   name: aws-lb-nginx
   labels:
     app: nginx
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: tcp
 spec:
   ports:
-  - port: 80
+  - name: http
     protocol: TCP
+    port: 80
   selector:
     app: nginx
   type: LoadBalancer

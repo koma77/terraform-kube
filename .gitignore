@@ -1,4 +1,5 @@
 bin/
+ansible/*.retry
 .terraform
 *.backup
 *.tfstate*

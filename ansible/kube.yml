@@ -1,0 +1,63 @@
+- hosts: all
+  become: true
+  gather_facts: no
+
+  tasks:
+    - name: wait for server come back
+      wait_for: >
+        host="{{ inventory_hostname }}"
+        port=22
+        state=started
+        delay=45
+        connect_timeout=90
+      delegate_to: localhost
+
+    - name: ensure kubernetes installed
+      package: name={{ item }} state=present
+      tags: ["install"]
+      with_items:
+        - kubernetes-master
+        - kubernetes-node
+        - etcd
+
+    - name: configure docker
+      copy: src={{ item }} dest=/etc/sysconfig/{{ item }} mode="0644"
+      tags: ["install"]
+      with_items:
+        - docker-storage
+        - docker-network
+
+    - name: configure kubernetes
+      copy: src={{ item }} dest=/etc/kubernetes/{{ item }}
+      tags: ["install"]
+      with_items:
+        - controller-manager
+        - apiserver
+        - kubelet
+
+    - name: enable services
+      service: name={{ item }} state=started enabled=yes
+      tags: ["install"]
+      with_items:
+        - etcd
+        - docker
+        - kube-apiserver
+        - kube-scheduler
+        - kube-controller-manager
+        - kube-proxy
+        - kubelet
+
+    - name: upload test rc/svc
+      copy: src={{ item }} dest=/root/{{ item }} mode="0644"
+      #notify:
+      #  - restart docker
+      with_items:
+        - rc-nginx.yml
+        - svc-nginx.yml
+        - svc-lb-nginx.yml
+      tags: ["deploy"]
+
+#   handlers:
+#    - name: restart docker
+#      service: name=docker state=restarted
+

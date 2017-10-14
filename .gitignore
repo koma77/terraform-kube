@@ -1,6 +1,8 @@
 bin/
 ansible/*.retry
 ansible/ssl/*
+ansible/invertory/*
+kubectl_config
 .terraform
 *.backup
 *.tfstate*

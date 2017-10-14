@@ -119,7 +119,7 @@ resource "aws_security_group" "kube_sec_group" {
 
 resource "aws_security_group" "kube_api_elb" {
   name        = "kube_api_sec_group_elb"
-  description = "! Managed by terraform"
+  description = "Managed by terraform"
   vpc_id      = "${aws_vpc.kube_vpc.id}"
 
   ingress {
@@ -161,7 +161,7 @@ resource "aws_elb" "kube_api" {
     healthy_threshold   = 2
     unhealthy_threshold = 2
     timeout             = 2
-    target              = "TCP:6443/"
+    target              = "TCP:6443"
     interval            = 5
   }
 
@@ -190,6 +190,10 @@ resource "aws_instance" "kube" {
     delete_on_termination = "true"
   }
 
+}
+
+### Need this to break dependancy cycle between elb and instance
+resource "null_resource" "ansible-provisioner" {
   #provisioner "remote-exec" {
   #  inline = [
   #    "sudo yum -y install epel-release",
@@ -199,7 +203,7 @@ resource "aws_instance" "kube" {
   #}
 
   provisioner "local-exec" {
-    command = "sleep 10; ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u centos  --private-key ~/.ssh/terraform -i '${aws_instance.kube.public_ip},' ansible/kube.yml"
+    command = "sleep 10; ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u centos  --private-key ~/.ssh/terraform -i ${aws_instance.kube.public_ip}, -e kube_api_addr=${aws_instance.kube.private_ip} -e kube_api_elb=${aws_elb.kube_api.dns_name} ansible/kube.yml"
   }
 
 }

@@ -1,0 +1,23 @@
+apiVersion: v1
+clusters:
+- cluster:
+    insecure-skip-tls-verify: true
+    server: https://{{ kube_api_elb }}
+  name: e2test
+contexts:
+- context:
+    cluster: e2test
+    user: ""
+  name: default
+- context:
+    cluster: e2test
+    user: test1
+  name: test-context
+current-context: test-context
+kind: Config
+preferences: {}
+users:
+- name: test1
+  user:
+    client-certificate: ansible/ssl/kubecfg.crt
+    client-key: ansible/ssl/kubecfg.key

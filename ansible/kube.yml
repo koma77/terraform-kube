@@ -3,14 +3,37 @@
   gather_facts: no
 
   tasks:
-    - name: wait for server come back
-      wait_for: >
-        host="{{ inventory_hostname }}"
-        port=22
-        state=started
-        delay=45
-        connect_timeout=90
+    - name: get effective group name
+      command: "id -gn"
+      register: gname
+      tags: ["cert"]
       delegate_to: localhost
+      connection: local
+      become: no
+
+    - name: ensure certificate management script exists
+      get_url:
+        url: https://raw.githubusercontent.com/kubernetes/kubernetes/master/cluster/saltbase/salt/generate-cert/make-ca-cert.sh
+        dest: "{{ playbook_dir }}/make-ca-cert.sh"
+        mode: "0755"
+        force: no
+      tags: ["cert"]
+      delegate_to: localhost
+      connection: local
+      become: no
+
+    - name: generate certs
+      shell: "{{ playbook_dir }}/make-ca-cert.sh {{ kube_api_addr }} IP:127.0.0.1,IP:{{ kube_api_addr }},DNS:{{ kube_api_elb }},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local"
+      environment:
+        CERT_DIR: "{{ playbook_dir }}/ssl"
+        CERT_GROUP: "{{ gname.stdout }}"
+      args:
+        creates: 
+          "{{ playbook_dir }}/ssl/server.cert"
+      tags: ["cert"]
+      delegate_to: localhost
+      connection: local
+      become: no
 
     - name: ensure kubernetes installed
       package: name={{ item }} state=present
@@ -35,6 +58,14 @@
         - apiserver
         - kubelet
 
+    - name: upload kubernetes ssl certificates
+      copy: src={{ playbook_dir }}/ssl/{{ item }} dest=/srv/kubernetes/{{ item }} mode="0660" owner="root" group="kube"
+      tags: ["install"]
+      with_items:
+        - ca.crt 
+        - server.cert
+        - server.key
+
     - name: enable services
       service: name={{ item }} state=started enabled=yes
       tags: ["install"]
@@ -46,16 +77,6 @@
         - kube-controller-manager
         - kube-proxy
         - kubelet
-
-    - name: upload test rc/svc
-      copy: src={{ item }} dest=/root/{{ item }} mode="0644"
-      #notify:
-      #  - restart docker
-      with_items:
-        - rc-nginx.yml
-        - svc-nginx.yml
-        - svc-lb-nginx.yml
-      tags: ["deploy"]
 
 #   handlers:
 #    - name: restart docker

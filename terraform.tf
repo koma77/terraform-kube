@@ -78,27 +78,6 @@ resource "aws_iam_instance_profile" "kube_controller" {
   role = "${aws_iam_role.kube_controller.name}"
 }
 
-#resource "aws_security_group" "elb" {
-#  name        = "test_sec_group_elb"
-#  description = "! Managed by terraform"
-#  vpc_id      = "${aws_vpc.test_vpc.id}"
-#
-#  ingress {
-#    from_port   = 80
-#    to_port     = 80
-#    protocol    = "tcp"
-#    cidr_blocks = ["0.0.0.0/0"]
-#  }
-#
-#  egress {
-#    from_port   = 0
-#    to_port     = 0
-#    protocol    = "-1"
-#    cidr_blocks = ["0.0.0.0/0"]
-#  }
-#}
-
-
 resource "aws_security_group" "kube_sec_group" {
   name        = "kube_sec_group"
   description = "Managed by terraform"
@@ -120,6 +99,15 @@ resource "aws_security_group" "kube_sec_group" {
     cidr_blocks = ["10.0.10.0/24"]
   }
 
+## kube-api from the VPC
+  ingress {
+    from_port   = 6443
+    to_port     = 6443
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.10.0/24"]
+  }
+
+
   # outbound internet access
   egress {
     from_port   = 0
@@ -129,10 +117,54 @@ resource "aws_security_group" "kube_sec_group" {
   }
 }
 
+resource "aws_security_group" "kube_api_elb" {
+  name        = "kube_api_sec_group_elb"
+  description = "! Managed by terraform"
+  vpc_id      = "${aws_vpc.kube_vpc.id}"
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
 
 resource "aws_key_pair" "auth" {
   key_name   = "terraform"
   public_key = "${file("~/.ssh/terraform.pub")}"
+}
+
+
+resource "aws_elb" "kube_api" {
+  name = "kube-api-elb"
+
+  subnets         = ["${aws_subnet.kube_subnet.id}"]
+  security_groups = ["${aws_security_group.kube_api_elb.id}"]
+  instances       = ["${aws_instance.kube.id}"]
+
+  listener {
+    instance_port     = 6443
+    instance_protocol = "tcp"
+    lb_port           = 443
+    lb_protocol       = "tcp"
+  }
+
+  health_check {
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    timeout             = 2
+    target              = "TCP:6443/"
+    interval            = 5
+  }
+
 }
 
 resource "aws_instance" "kube" {
@@ -158,20 +190,26 @@ resource "aws_instance" "kube" {
     delete_on_termination = "true"
   }
 
-  provisioner "remote-exec" {
-    inline = [
-      "sudo yum -y install epel-release",
-      "sudo yum -y update",
-      "sudo shutdown -r"
-    ]
-  }
+  #provisioner "remote-exec" {
+  #  inline = [
+  #    "sudo yum -y install epel-release",
+  #    "sudo yum -y update",
+  #    "sudo shutdown -r"
+  #  ]
+  #}
 
   provisioner "local-exec" {
-    command = "ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u centos  --private-key ~/.ssh/terraform -i '${aws_instance.kube.public_ip},' ansible/kube.yml"
+    command = "sleep 10; ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u centos  --private-key ~/.ssh/terraform -i '${aws_instance.kube.public_ip},' ansible/kube.yml"
   }
 
 }
 
+
 output "kube_vm_ip" {
-    value = "${aws_instance.kube.public_ip}"
+  value = "${aws_instance.kube.public_ip}"
+}
+
+
+output "kube-api" {
+  value = "${aws_elb.kube_api.dns_name}"  
 }

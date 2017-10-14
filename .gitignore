@@ -1,5 +1,6 @@
 bin/
 ansible/*.retry
+ansible/ssl/*
 .terraform
 *.backup
 *.tfstate*

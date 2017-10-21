@@ -179,7 +179,6 @@ resource "aws_instance" "kube" {
   ami = "ami-602f5403"
 
   key_name = "${aws_key_pair.auth.id}"
-  user_data = "${file("cloud-config.yml")}"
 
   vpc_security_group_ids = ["${aws_security_group.kube_sec_group.id}"]
   subnet_id = "${aws_subnet.kube_subnet.id}"

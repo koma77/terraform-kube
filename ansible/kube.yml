@@ -47,14 +47,17 @@
       raw:  stat /opt/bin/pypy
       register: pypy_is_installed
       ignore_errors: True
+      tags: ["install"]
 
     - name: download pypy
       when: pypy_is_installed | failed
-      raw: wget -nc -O "/opt/pypy.tar.bz2" https://bitbucket.org/squeaky/portable-pypy/downloads/pypy-5.9-linux_x86_64-portable.tar.bz2
+      raw: wget -nc -O /opt/pypy.tar.bz2 https://bitbucket.org/squeaky/portable-pypy/downloads/pypy-5.9-linux_x86_64-portable.tar.bz2
+      tags: ["install"]
 
     - name: iextract pypy
       when: pypy_is_installed | failed
       raw: test $(md5sum /opt/pypy.tar.bz2 | cut -d' ' -f1  ) = 65e4bcf1c18a1c3f2b1405c654d10755 && tar jxvf /opt/pypy.tar.bz2 -C /opt/ && mkdir /opt/bin && ln -s /opt/pypy-5.9-linux_x86_64-portable/bin/pypy /opt/bin/pypy
+      tags: ["install"]
 
     # https://coreos.com/blog/introducing-the-kubelet-in-coreos.html
     # https://coreos.com/kubernetes/docs/latest/deploy-master.html
@@ -62,16 +65,19 @@
       vars:
         ansible_python_interpreter: /opt/bin/pypy
       copy: src=kubelet.service dest=/etc/systemd/system/kubelet.service mode="0644" owner="root"
+      tags: ["install"]
 
     - name: copy kubelet config
       vars:
         ansible_python_interpreter: /opt/bin/pypy
       copy: src=kubeconfig dest=/var/lib/kubelet/kubeconfig
+      tags: ["install"]
 
     - name: ensure /etc/kubernetes/manifests exists
       vars:
         ansible_python_interpreter: /opt/bin/pypy
       file: dest=/etc/kubernetes/manifests state=directory
+      tags: ["install"]
 
     - name: copy kube pods configs
       vars:
@@ -82,6 +88,7 @@
         - kube-proxy.yml
         - kube-controller.yml
         - kube-scheduller.yml
+      tags: ["install"]
 
     - name: ensure /etc/kubernetes/ssl dir exists
       vars:

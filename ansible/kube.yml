@@ -42,35 +42,57 @@
       connection: local
       become: no
 
-    - name: ensure kubernetes installed
-      package: name={{ item }} state=present
-      tags: ["install"]
-      with_items:
-        - kubernetes-master
-        - kubernetes-node
-        - etcd
 
-    - name: configure docker
-      copy: src={{ item }} dest=/etc/sysconfig/{{ item }} mode="0644"
-      tags: ["install"]
-      with_items:
-        - docker-storage
-        - docker-network
+    - name: check pypy status
+      raw:  stat /opt/bin/pypy
+      register: pypy_is_installed
+      ignore_errors: True
 
-    - name: configure kubernetes
-      copy: src={{ item }} dest=/etc/kubernetes/{{ item }}
-      tags: ["install"]
-      with_items:
-        - controller-manager
-        - apiserver
-        - kubelet
+    - name: download pypy
+      when: pypy_is_installed | failed
+      raw: wget -nc -O "/opt/pypy.tar.bz2" https://bitbucket.org/squeaky/portable-pypy/downloads/pypy-5.9-linux_x86_64-portable.tar.bz2
 
-    - name: ensure /srv/kubernetes dir exists
-      file: dest=/srv/kubernetes state=directory owner="root"
+    - name: iextract pypy
+      when: pypy_is_installed | failed
+      raw: test $(md5sum /opt/pypy.tar.bz2 | cut -d' ' -f1  ) = 65e4bcf1c18a1c3f2b1405c654d10755 && tar jxvf /opt/pypy.tar.bz2 -C /opt/ && mkdir /opt/bin && ln -s /opt/pypy-5.9-linux_x86_64-portable/bin/pypy /opt/bin/pypy
+
+    # https://coreos.com/blog/introducing-the-kubelet-in-coreos.html
+    # https://coreos.com/kubernetes/docs/latest/deploy-master.html
+    - name: copy kubelet unit
+      vars:
+        ansible_python_interpreter: /opt/bin/pypy
+      copy: src=kubelet.service dest=/etc/systemd/system/kubelet.service mode="0644" owner="root"
+
+    - name: copy kubelet config
+      vars:
+        ansible_python_interpreter: /opt/bin/pypy
+      copy: src=kubeconfig dest=/var/lib/kubelet/kubeconfig
+
+    - name: ensure /etc/kubernetes/manifests exists
+      vars:
+        ansible_python_interpreter: /opt/bin/pypy
+      file: dest=/etc/kubernetes/manifests state=directory
+
+    - name: copy kube pods configs
+      vars:
+        ansible_python_interpreter: /opt/bin/pypy
+      copy: src={{ item }} dest=/etc/kubernetes/manifests/{{ item }} mode="0644"
+      with_items:
+        - kube-apiserver.yml
+        - kube-proxy.yml
+        - kube-controller.yml
+        - kube-scheduller.yml
+
+    - name: ensure /etc/kubernetes/ssl dir exists
+      vars:
+        ansible_python_interpreter: /opt/bin/pypy
+      file: dest=/etc/kubernetes/ssl state=directory owner="root"
       tags: ["install"]
 
     - name: upload kubernetes ssl certificates
-      copy: src={{ playbook_dir }}/ssl/{{ item }} dest=/srv/kubernetes/{{ item }} mode="0660" owner="root" group="kube"
+      vars:
+        ansible_python_interpreter: /opt/bin/pypy
+      copy: src={{ playbook_dir }}/ssl/{{ item }} dest=/etc/kubernetes/ssl/{{ item }} mode="0660" owner="root"
       tags: ["install"]
       with_items:
         - ca.crt 
@@ -78,18 +100,10 @@
         - server.key
 
     - name: enable services
-      service: name={{ item }} state=started enabled=yes
+      vars:
+        ansible_python_interpreter: /opt/bin/pypy
+      systemd: name={{ item }} state=started enabled=yes
       tags: ["install"]
       with_items:
-        - etcd
-        - docker
-        - kube-apiserver
-        - kube-scheduler
-        - kube-controller-manager
-        - kube-proxy
         - kubelet
-
-#   handlers:
-#    - name: restart docker
-#      service: name=docker state=restarted
 

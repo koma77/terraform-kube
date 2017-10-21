@@ -169,20 +169,19 @@ resource "aws_elb" "kube_api" {
 
 resource "aws_instance" "kube" {
   connection {
-    user = "centos"
+    user = "core"
     private_key = "${file("~/.ssh/terraform")}"
   }
 
   instance_type = "t2.micro"
   iam_instance_profile = "${aws_iam_instance_profile.kube_controller.id}"
-  iam_instance_profile = "${aws_iam_instance_profile.kube_controller.id}"
 
-  ami = "ami-1fbad07c"
+  ami = "ami-602f5403"
 
   key_name = "${aws_key_pair.auth.id}"
+  user_data = "${file("cloud-config.yml")}"
 
   vpc_security_group_ids = ["${aws_security_group.kube_sec_group.id}"]
-
   subnet_id = "${aws_subnet.kube_subnet.id}"
 
   root_block_device {
@@ -194,20 +193,10 @@ resource "aws_instance" "kube" {
 
 ### Need this to break dependancy cycle between elb and instance
 resource "null_resource" "ansible-provisioner" {
-  #provisioner "remote-exec" {
-  #  inline = [
-  #    "sudo yum -y install epel-release",
-  #    "sudo yum -y update",
-  #    "sudo shutdown -r"
-  #  ]
-  #}
-
   provisioner "local-exec" {
-    command = "sleep 10; ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u centos  --private-key ~/.ssh/terraform -i ${aws_instance.kube.public_ip}, -e kube_api_addr=${aws_instance.kube.private_ip} -e kube_api_elb=${aws_elb.kube_api.dns_name} ansible/kube.yml"
+    command = "sleep 10; ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u core  --private-key ~/.ssh/terraform -i ${aws_instance.kube.public_ip}, -e kube_api_addr=${aws_instance.kube.private_ip} -e kube_api_elb=${aws_elb.kube_api.dns_name} ansible/kube.yml"
   }
-
 }
-
 
 output "kube_vm_ip" {
   value = "${aws_instance.kube.public_ip}"

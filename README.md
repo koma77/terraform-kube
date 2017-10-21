@@ -5,3 +5,5 @@ This is an attempt to create a one node kubernetes cluster using tf + ansible to
 Ansilbe should create a kubectl config file, pls check certificates path with:
 
 KUBECONFIG=kubectl\_config ./bin/kubectl config view
+
+For CoreOS kube 1.8.0 pls take a look at CoreOS branch

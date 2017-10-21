@@ -1,0 +1,13 @@
+#cloud-config
+hostname: kube
+coreos:
+  update:
+    reboot-strategy: "off"
+
+write_files:
+  - path /opt/bin/python
+    permissions: 0755
+    content: |
+      #!/bin/bash
+      docker run python:2.7 python "$@"
+

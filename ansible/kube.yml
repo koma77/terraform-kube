@@ -51,12 +51,13 @@
 
     - name: download pypy
       when: pypy_is_installed | failed
-      raw: wget -nc -O /opt/pypy.tar.bz2 https://bitbucket.org/squeaky/portable-pypy/downloads/pypy-5.9-linux_x86_64-portable.tar.bz2
+      raw: mkdir -p /opt/bin && wget -nc -O /opt/pypy.tar.bz2 https://bitbucket.org/squeaky/portable-pypy/downloads/pypy-5.9-linux_x86_64-portable.tar.bz2
+      ignore_errors: True
       tags: ["install"]
 
-    - name: iextract pypy
+    - name: extract pypy
       when: pypy_is_installed | failed
-      raw: test $(md5sum /opt/pypy.tar.bz2 | cut -d' ' -f1  ) = 65e4bcf1c18a1c3f2b1405c654d10755 && tar jxvf /opt/pypy.tar.bz2 -C /opt/ && mkdir /opt/bin && ln -s /opt/pypy-5.9-linux_x86_64-portable/bin/pypy /opt/bin/pypy
+      raw: test $(md5sum /opt/pypy.tar.bz2 | cut -d' ' -f1  ) = 65e4bcf1c18a1c3f2b1405c654d10755 && tar jxvf /opt/pypy.tar.bz2 -C /opt/ && ln -s /opt/pypy-5.9-linux_x86_64-portable/bin/pypy /opt/bin/pypy
       tags: ["install"]
 
     # https://coreos.com/blog/introducing-the-kubelet-in-coreos.html
@@ -65,6 +66,12 @@
       vars:
         ansible_python_interpreter: /opt/bin/pypy
       copy: src=kubelet.service dest=/etc/systemd/system/kubelet.service mode="0644" owner="root"
+      tags: ["install"]
+
+    - name: ensure /var/lib/kubelet exists
+      vars:
+        ansible_python_interpreter: /opt/bin/pypy
+      file: dest=/var/lib/kubelet state=directory
       tags: ["install"]
 
     - name: copy kubelet config

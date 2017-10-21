@@ -116,7 +116,7 @@
     - name: enable services
       vars:
         ansible_python_interpreter: /opt/bin/pypy
-      systemd: name={{ item }} state=started enabled=yes
+      systemd: name={{ item }} state=started enabled=yes daemon_reload=yes
       tags: ["install"]
       with_items:
         - kubelet
